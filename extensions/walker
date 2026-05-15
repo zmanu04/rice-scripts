@@ -1,8 +1,9 @@
 #!/bin/bash
 # Extension: Walker GTK4 Theme Reloader
 
-# Walker automatically reloads style.css variations when it catches a file modification event.
-# We touch its configuration folder to instantly force a cache update.
-if pgrep -x "walker" > /dev/null; then
-    touch ~/.config/walker/style.css
-fi
+# Flush Walker's background cache completely to apply the new CSS matrix
+pkill -f walker
+walker --gdbus --quit >/dev/null 2>&1
+
+# Spin the daemon back up in background service mode
+walker --service &
