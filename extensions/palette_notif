@@ -1,0 +1,37 @@
+#!/bin/bash
+# Extension: Dynamic Color Palette Notification (Dunst Variant)
+
+# 1. Source Pywal's active color variables so Bash can read hex strings
+source "$HOME/.cache/wal/colors.sh"
+
+OUTPUT_IMG="/tmp/wal_palette.png"
+
+# 2. Build the color swatch image strip using ImageMagick
+magick -size 600x60 xc:transparent \
+  -fill "$color0" -draw "rectangle 0,0 75,60" \
+  -fill "$color1" -draw "rectangle 75,0 150,60" \
+  -fill "$color2" -draw "rectangle 150,0 225,60" \
+  -fill "$color3" -draw "rectangle 225,0 300,60" \
+  -fill "$color4" -draw "rectangle 300,0 375,60" \
+  -fill "$color5" -draw "rectangle 375,0 450,60" \
+  -fill "$color6" -draw "rectangle 450,0 525,60" \
+  -fill "$color7" -draw "rectangle 525,0 600,60" \
+  "$OUTPUT_IMG"
+
+# 3. Detect the active monitor where your cursor is right now via Hyprland
+ACTIVE_MON=$(hyprctl monitors -j | jq -r '.[] | select(.focused == true) | .name')
+
+# 4. Tear down the old Dunst instance
+pkill dunst
+
+# 5. Relaunch Dunst by injecting Pywal hex variables directly into its flags!
+# This overrides your background (-bg), foreground (-fg), and border (-frame) themes dynamically.
+dunst \
+  -mon "$ACTIVE_MON" \
+  -lb "$color0" -nb "$color0" -cb "$color0" \
+  -lf "$color7" -nf "$color7" -cf "$color7" \
+  -frame_color "$color4" &
+
+# 6. Fire the notification toast on your active screen
+sleep 0.15
+notify-send -a "System Rice" -i "$OUTPUT_IMG" "Theme Generation Complete" "New palette successfully mapped across your environment."
