@@ -1,9 +1,8 @@
 #!/bin/bash
-# Extension: Dynamic Color Palette Notification (Dunst Variant)
+# Extension: Dynamic Color Palette Notification (Dunst Drop-in Variant)
 
-# 1. Source Pywal's active color variables so Bash can read hex strings
+# 1. Source Pywal's active color variables
 source "$HOME/.cache/wal/colors.sh"
-
 OUTPUT_IMG="/tmp/wal_palette.png"
 
 # 2. Build the color swatch image strip using ImageMagick
@@ -18,19 +17,36 @@ magick -size 600x60 xc:transparent \
   -fill "$color7" -draw "rectangle 525,0 600,60" \
   "$OUTPUT_IMG"
 
-# 3. Detect the active monitor where your cursor is right now via Hyprland
-ACTIVE_MON=$(hyprctl monitors -j | jq -r '.[] | select(.focused == true) | .name')
+# 3. Get the exact monitor name where your cursor is right now via Hyprland
+ACTIVE_MON=$(hyprctl activeworkspace -j | grep -oP '"monitor":\s*"\K[^"]+')
 
-# 4. Tear down the old Dunst instance
+# 4. Generate Dunst's drop-in theme file dynamically
+# This forces Dunst to read these exact hex codes regardless of your main config!
+mkdir -p ~/.config/dunst/dunstrc.d
+cat << DUNST_THEME > ~/.config/dunst/dunstrc.d/colors.conf
+[global]
+    monitor = $ACTIVE_MON
+
+[urgency_low]
+    background = "$color0"
+    foreground = "$color7"
+    frame_color = "$color4"
+
+[urgency_normal]
+    background = "$color0"
+    foreground = "$color7"
+    frame_color = "$color4"
+
+[urgency_critical]
+    background = "$color0"
+    foreground = "$color1"
+    frame_color = "$color1"
+DUNST_THEME
+
+# 5. Completely tear down and reload Dunst so it processes the drop-in file
 pkill dunst
-
-# 5. Relaunch Dunst by injecting Pywal hex variables directly into its flags!
-# This overrides your background (-bg), foreground (-fg), and border (-frame) themes dynamically.
-dunst \
-  -mon "$ACTIVE_MON" \
-  -lb "$color0" -nb "$color0" -cb "$color0" \
-  -lf "$color7" -nf "$color7" -cf "$color7" \
-  -frame_color "$color4" &
+sleep 0.1
+dunst &
 
 # 6. Fire the notification toast on your active screen
 sleep 0.15
