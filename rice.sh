@@ -8,15 +8,22 @@ if [ -z "$WALL" ]; then
     exit 1
 fi
 
-echo ">>> Changing wallpaper to: $WALL"
+echo ">>> Changing wallpaper to: $(basename "$WALL")"
 
-# Apply it with SWWW (with a slick HyDE wipe transition)
-swww img "$WALL" --transition-type wipe --transition-angle 30 --transition-step 90
+# 1. Apply it with SWWW (silenced completely)
+swww img "$WALL" --transition-type wipe --transition-angle 30 --transition-step 90 >/dev/null 2>&1 &
 
-# Generate the master color palette via Pywal
-wal -i "$WALL" -n -q
+# 2. Generate the master color palette via Pywal (silenced entirely)
+wal -i "$WALL" -n -q >/dev/null 2>&1
 
-# Tell all open Kitty terminals to live-reload the new colors
+# 3. Tell all open Kitty terminals to live-reload the new colors
 killall -SIGUSR1 kitty
+
+# 4. Give Kitty half a second to finish painting the new background scheme
+sleep 0.5
+
+# 5. Forcefully sanitize and reset the terminal state to fix the offset text bug
+stty sane
+tput reset
 
 echo ">>> System Riced Successfully!"
