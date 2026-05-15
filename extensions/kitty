@@ -1,0 +1,5 @@
+#!/bin/bash
+# Extension: Kitty Live-Reload Terminal Colors
+
+# Signal all open Kitty terminals to immediately pull the new cache from Pywal
+killall -SIGUSR1 kitty

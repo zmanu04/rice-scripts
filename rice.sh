@@ -1,29 +1,38 @@
 #!/bin/bash
 
-# Pick a random image from your Wallpapers folder
-WALL=$(find ~/Pictures/Wallpapers -type f \( -name "*.jpg" -o -name "*.png" -o -name "*.jpeg" -o -name "*.webp" \) | shuf -n 1)
+# 1. Core Configuration
+EXTENSION_DIR="$HOME/src/rice-scripts/extensions"
+WALL_DIR="$HOME/Pictures/Wallpapers"
+
+# 2. Pick a random wallpaper
+WALL=$(find "$WALL_DIR" -type f \( -name "*.jpg" -o -name "*.png" -o -name "*.jpeg" -o -name "*.webp" \) | shuf -n 1)
 
 if [ -z "$WALL" ]; then
-    echo "ERROR: No wallpapers found in ~/Pictures/Wallpapers"
+    echo "ERROR: No wallpapers found in $WALL_DIR"
     exit 1
 fi
 
-echo ">>> Changing wallpaper to: $(basename "$WALL")"
+echo ">>> Orchestrator: Selected Wallpaper -> $(basename "$WALL")"
 
-# 1. Apply it with SWWW (silenced completely)
+# 3. Apply the wallpaper image with SWWW globally
 swww img "$WALL" --transition-type wipe --transition-angle 30 --transition-step 90 >/dev/null 2>&1 &
 
-# 2. Generate the master color palette via Pywal (silenced entirely)
+# 4. Extract core palette using Pywal
 wal -i "$WALL" -n -q >/dev/null 2>&1
 
-# 3. Tell all open Kitty terminals to live-reload the new colors
-killall -SIGUSR1 kitty
+# 5. Modular Loop: Execute every active extension file
+if [ -d "$EXTENSION_DIR" ]; then
+    for ext in "$EXTENSION_DIR"/*; do
+        if [ -x "$ext" ]; then
+            echo ">>> Running Extension: $(basename "$ext")"
+            "$ext" "$WALL" &
+        fi
+    done
+fi
 
-# 4. Give Kitty half a second to finish painting the new background scheme
-sleep 0.5
-
-# 5. Forcefully sanitize and reset the terminal state to fix the offset text bug
+# 6. Sanitize and restore terminal viewport
+sleep 0.4
 stty sane
 tput reset
 
-echo ">>> System Riced Successfully!"
+echo ">>> Engine: System Riced Successfully!"
