@@ -1,0 +1,8 @@
+#!/bin/bash
+# Extension: Dunst Notification Reloader
+
+# 1. Kill the active Dunst worker instance
+pkill dunst
+
+# 2. Restart Dunst in the background pointing directly to Pywal's generated config file
+dunst -config ~/.cache/wal/colors-dunst &
