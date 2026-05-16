@@ -1,26 +1,26 @@
 #!/bin/bash
-# Extension: Dynamic Color Palette Notification (Wallust Edition)
+# Extension: Dynamic Color Palette Notification (Wallust JSON Variant)
 
-# 1. Source Wallust's active color variables so Bash can read hex values
-if [ -f "$HOME/.cache/wallust/sequences" ]; then
-    # Wallust saves a shell-compatible script we can source directly
-    source "$HOME/.cache/wallust/sequences"
-fi
-
-# Fallback: Parse Wallust's text export if sequences aren't exported as raw vars
-# (Wallust uses standard Xresources/shell format variables)
-COLOR0=$(wallust cs 0)
-COLOR1=$(wallust cs 1)
-COLOR2=$(wallust cs 2)
-COLOR3=$(wallust cs 3)
-COLOR4=$(wallust cs 4)
-COLOR5=$(wallust cs 5)
-COLOR6=$(wallust cs 6)
-COLOR7=$(wallust cs 7)
-
+CACHE_FILE="$HOME/.cache/wallust/colors.json"
 OUTPUT_IMG="/tmp/wal_palette.png"
 
-# 2. Build the color swatch image strip using ImageMagick
+# 1. Fallback check: If Wallust hasn't run yet, skip image generation
+if [ ! -f "$CACHE_FILE" ]; then
+    notify-send -a "System Rice" "Theme Generation Complete" "Colors mapped across environment."
+    exit 0
+fi
+
+# 2. Extract the exact hex values safely out of Wallust's JSON storage map using jq
+COLOR0=$(jq -r '.colors.color0' "$CACHE_FILE")
+COLOR1=$(jq -r '.colors.color1' "$CACHE_FILE")
+COLOR2=$(jq -r '.colors.color2' "$CACHE_FILE")
+COLOR3=$(jq -r '.colors.color3' "$CACHE_FILE")
+COLOR4=$(jq -r '.colors.color4' "$CACHE_FILE")
+COLOR5=$(jq -r '.colors.color5' "$CACHE_FILE")
+COLOR6=$(jq -r '.colors.color6' "$CACHE_FILE")
+COLOR7=$(jq -r '.colors.color7' "$CACHE_FILE")
+
+# 3. Build the visual color swatch image strip using ImageMagick
 magick -size 600x60 xc:transparent \
   -fill "$COLOR0" -draw "rectangle 0,0 75,60" \
   -fill "$COLOR1" -draw "rectangle 75,0 150,60" \
@@ -32,19 +32,11 @@ magick -size 600x60 xc:transparent \
   -fill "$COLOR7" -draw "rectangle 525,0 600,60" \
   "$OUTPUT_IMG"
 
-# 3. Detect the active monitor name via Hyprland
-ACTIVE_MON=$(hyprctl activeworkspace -j | grep -oP '"monitor":\s*"\K[^"]+')
-
-# 4. Use inline editing (sed) to force the generated Dunst file to map to your active monitor
-if [ -f "$HOME/.config/dunst/dunstrc.d/colors.conf" ]; then
-    sed -i "s/monitor = .*/monitor = $ACTIVE_MON/" ~/.config/dunst/dunstrc.d/colors.conf
-fi
-
-# 5. Cycle Dunst cleanly to pick up the new file
+# 4. Gracefully reload Dunst background service worker to pull the new file
 pkill dunst
 sleep 0.05
 dunst &
 
-# 6. Fire the gorgeous color-matched notification toast
+# 5. Fire the notification toast showing your gorgeous new color palette!
 sleep 0.1
 notify-send -a "System Rice" -i "$OUTPUT_IMG" "Theme Generation Complete" "Wallust has successfully optimized your workspace colors."
