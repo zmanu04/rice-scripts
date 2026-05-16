@@ -1,53 +1,50 @@
 #!/bin/bash
-# Extension: Dynamic Color Palette Notification (Dunst Drop-in Variant)
+# Extension: Dynamic Color Palette Notification (Wallust Edition)
 
-# 1. Source Pywal's active color variables
-source "$HOME/.cache/wal/colors.sh"
+# 1. Source Wallust's active color variables so Bash can read hex values
+if [ -f "$HOME/.cache/wallust/sequences" ]; then
+    # Wallust saves a shell-compatible script we can source directly
+    source "$HOME/.cache/wallust/sequences"
+fi
+
+# Fallback: Parse Wallust's text export if sequences aren't exported as raw vars
+# (Wallust uses standard Xresources/shell format variables)
+COLOR0=$(wallust cs 0)
+COLOR1=$(wallust cs 1)
+COLOR2=$(wallust cs 2)
+COLOR3=$(wallust cs 3)
+COLOR4=$(wallust cs 4)
+COLOR5=$(wallust cs 5)
+COLOR6=$(wallust cs 6)
+COLOR7=$(wallust cs 7)
+
 OUTPUT_IMG="/tmp/wal_palette.png"
 
 # 2. Build the color swatch image strip using ImageMagick
 magick -size 600x60 xc:transparent \
-  -fill "$color0" -draw "rectangle 0,0 75,60" \
-  -fill "$color1" -draw "rectangle 75,0 150,60" \
-  -fill "$color2" -draw "rectangle 150,0 225,60" \
-  -fill "$color3" -draw "rectangle 225,0 300,60" \
-  -fill "$color4" -draw "rectangle 300,0 375,60" \
-  -fill "$color5" -draw "rectangle 375,0 450,60" \
-  -fill "$color6" -draw "rectangle 450,0 525,60" \
-  -fill "$color7" -draw "rectangle 525,0 600,60" \
+  -fill "$COLOR0" -draw "rectangle 0,0 75,60" \
+  -fill "$COLOR1" -draw "rectangle 75,0 150,60" \
+  -fill "$COLOR2" -draw "rectangle 150,0 225,60" \
+  -fill "$COLOR3" -draw "rectangle 225,0 300,60" \
+  -fill "$COLOR4" -draw "rectangle 300,0 375,60" \
+  -fill "$COLOR5" -draw "rectangle 375,0 450,60" \
+  -fill "$COLOR6" -draw "rectangle 450,0 525,60" \
+  -fill "$COLOR7" -draw "rectangle 525,0 600,60" \
   "$OUTPUT_IMG"
 
-# 3. Get the exact monitor name where your cursor is right now via Hyprland
+# 3. Detect the active monitor name via Hyprland
 ACTIVE_MON=$(hyprctl activeworkspace -j | grep -oP '"monitor":\s*"\K[^"]+')
 
-# 4. Generate Dunst's drop-in theme file dynamically
-# This forces Dunst to read these exact hex codes regardless of your main config!
-mkdir -p ~/.config/dunst/dunstrc.d
-cat << DUNST_THEME > ~/.config/dunst/dunstrc.d/colors.conf
-[global]
-    monitor = $ACTIVE_MON
+# 4. Use inline editing (sed) to force the generated Dunst file to map to your active monitor
+if [ -f "$HOME/.config/dunst/dunstrc.d/colors.conf" ]; then
+    sed -i "s/monitor = .*/monitor = $ACTIVE_MON/" ~/.config/dunst/dunstrc.d/colors.conf
+fi
 
-[urgency_low]
-    background = "$color0"
-    foreground = "$color7"
-    frame_color = "$color4"
-
-[urgency_normal]
-    background = "$color0"
-    foreground = "$color7"
-    frame_color = "$color4"
-
-[urgency_critical]
-    background = "$color0"
-    foreground = "$color1"
-    frame_color = "$color1"
-DUNST_THEME
-
-# 5. Completely tear down and reload Dunst so it processes the drop-in file
+# 5. Cycle Dunst cleanly to pick up the new file
 pkill dunst
-sleep 0.1
+sleep 0.05
 dunst &
 
-# 6. Fire the notification toast on your active screen
-sleep 0.15
-notify-send -a "System Rice" -i "$OUTPUT_IMG" "Theme Generation Complete" "New palette successfully mapped across your environment."
+# 6. Fire the gorgeous color-matched notification toast
+sleep 0.1
+notify-send -a "System Rice" -i "$OUTPUT_IMG" "Theme Generation Complete" "Wallust has successfully optimized your workspace colors."
