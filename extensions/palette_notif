@@ -1,24 +1,18 @@
 #!/bin/bash
-# Extension: Dynamic Color Palette Notification (Wallust JSON Variant)
+# Extension: Dynamic Color Palette Notification (High-Speed Variant)
 
-CACHE_FILE="$HOME/.cache/wallust/colors.json"
-OUTPUT_IMG="/tmp/wal_palette.png"
-
-# 1. Fallback check: If Wallust hasn't run yet, skip image generation
-if [ ! -f "$CACHE_FILE" ]; then
-    notify-send -a "System Rice" "Theme Generation Complete" "Colors mapped across environment."
-    exit 0
+# 1. Source Wallust's direct variables immediately (No more sleep!)
+VARS_FILE="$HOME/.cache/wallust/direct_vars.sh"
+if [ -f "$VARS_FILE" ]; then
+    source "$VARS_FILE"
+else
+    COLOR0="#000000"; COLOR1="#ff0000"; COLOR2="#00ff00"; COLOR3="#ffff00"
+    COLOR4="#0000ff"; COLOR5="#ff00ff"; COLOR6="#00ffff"; COLOR7="#ffffff"
 fi
 
-# 2. Extract the exact hex values safely out of Wallust's JSON storage map using jq
-COLOR0=$(jq -r '.colors.color0' "$CACHE_FILE")
-COLOR1=$(jq -r '.colors.color1' "$CACHE_FILE")
-COLOR2=$(jq -r '.colors.color2' "$CACHE_FILE")
-COLOR3=$(jq -r '.colors.color3' "$CACHE_FILE")
-COLOR4=$(jq -r '.colors.color4' "$CACHE_FILE")
-COLOR5=$(jq -r '.colors.color5' "$CACHE_FILE")
-COLOR6=$(jq -r '.colors.color6' "$CACHE_FILE")
-COLOR7=$(jq -r '.colors.color7' "$CACHE_FILE")
+# 2. Clear out old layout canvas assets
+rm /tmp/palette_*.png 2>/dev/null
+OUTPUT_IMG="/tmp/palette_$(date +%s).png"
 
 # 3. Build the visual color swatch image strip using ImageMagick
 magick -size 600x60 xc:transparent \
@@ -32,11 +26,17 @@ magick -size 600x60 xc:transparent \
   -fill "$COLOR7" -draw "rectangle 525,0 600,60" \
   "$OUTPUT_IMG"
 
-# 4. Gracefully reload Dunst background service worker to pull the new file
-pkill dunst
-sleep 0.05
-dunst &
+# 4. Grab your focused monitor name immediately via Hyprland
+ACTIVE_MON=$(hyprctl activeworkspace -j | grep -oP '"monitor":\s*"\K[^"]+')
+if [ -z "$ACTIVE_MON" ]; then
+    ACTIVE_MON="0"
+fi
 
-# 5. Fire the notification toast showing your gorgeous new color palette!
-sleep 0.1
-notify-send -a "System Rice" -i "$OUTPUT_IMG" "Theme Generation Complete" "Wallust has successfully optimized your workspace colors."
+# 5. Safely cycle Dunst while pinning it directly to your current monitor screen
+pkill dunst
+sleep 0.02
+dunst -mon "$ACTIVE_MON" &
+
+# 6. Fire the notification toast instantly
+sleep 0.05
+notify-send -a "System Rice" -i "$OUTPUT_IMG" "Theme Generation Complete" "New palette successfully mapped across your environment."

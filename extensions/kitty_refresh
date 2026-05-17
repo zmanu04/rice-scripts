@@ -1,0 +1,6 @@
+#!/bin/bash
+# Extension: Dynamic Kitty Theme Reloader
+
+# Broadcast the configuration reload signal across all active /tmp/kitty socket pipes
+kitty @ --to=unix:/tmp/kitty set-colors --all ~/.config/kitty/current-theme.conf
+killall -USR1 kitty
