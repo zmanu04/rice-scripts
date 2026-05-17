@@ -3,7 +3,7 @@
 # 1. Core Configuration
 EXTENSION_DIR="$HOME/src/rice-scripts/extensions"
 WALL_DIR="$HOME/Pictures/Wallpapers"
-CACHE_WALL_FILE="/tmp/current_wall"
+STATIC_WALL="/tmp/current_wallpaper.png"
 
 # 2. Pick a random wallpaper
 WALL=$(find "$WALL_DIR" -type f \( -name "*.jpg" -o -name "*.png" -o -name "*.jpeg" -o -name "*.webp" \) | shuf -n 1)
@@ -15,13 +15,6 @@ fi
 
 echo ">>> Orchestrator: Selected Wallpaper -> $(basename "$WALL")"
 
-# Keep track of the old wallpaper before we swap it
-if [ -f "$CACHE_WALL_FILE" ]; then
-    OLD_WALL=$(cat "$CACHE_WALL_FILE")
-else
-    OLD_WALL="$WALL" # Fallback if script is run for the first time
-fi
-
 # 3. CRITICAL SPEEDUP: Convert the wallpaper into a tiny 200px thumbnail cache
 THUMB="/tmp/wall_thumb.jpg"
 magick "$WALL" -scale 200x200 "$THUMB"
@@ -30,38 +23,49 @@ magick "$WALL" -scale 200x200 "$THUMB"
 wallust run -s "$THUMB" >/dev/null 2>&1
 
 # =====================================================================
-# 5. The Sync Reset & Seeded Transition Loop
+# 5. INTANT SMART MULTI-MONITOR TRANSITION (Bypasses Fullscreen Locks)
 # =====================================================================
-# Recycle the daemon to ensure the graphics pipeline is un-frozen
-killall awww-daemon 2>/dev/null
-rm -f "/run/user/$(id -u)/wayland-1-awww-daemon.sock"
-
-# Spin up the fresh daemon instance
-awww-daemon &
-sleep 0.25 # Give it a brief split second to connect to the display
-
-# STEP A: Feed the daemon the old wallpaper instantly so it has a reference frame.
-# This happens with NO animation, meaning your screen won't flicker at all.
-if [ -f "$OLD_WALL" ]; then
-    awww img "$OLD_WALL" --transition-type none >/dev/null 2>&1
-    sleep 0.1
+# Ensure the daemon is running natively
+if ! pgrep -x "awww-daemon" >/dev/null; then
+    rm -f "/run/user/$(id -u)/wayland-1-awww-daemon.sock"
+    WAYLAND_DISPLAY=wayland-1 awww-daemon &
+    sleep 0.2
 fi
 
 echo ">>> Applying wallpaper transition..."
-# STEP B: Now that the daemon has a frame in memory, the wipe transition works!
-# Isolated in a subshell () & disown to protect it from extension crashes.
-(awww img "$WALL" \
-    --transition-type wipe \
-    --transition-angle 30 \
-    --transition-step 10 \
-    --transition-pos top-right >/dev/null 2>&1) &
-disown
 
-# Save the new wallpaper path for the next script cycle
-echo "$WALL" > "$CACHE_WALL_FILE"
+# 1. Parse Hyprland's monitor layouts to build a list of monitors to update.
+# This filters out any monitor that currently has an active fullscreen window (hasFullscreen: true).
+SAFE_MONITORS=$(hyprctl monitors -j | jq -r '.[] | select(.fullscreen == false) | .name' | tr '\n' ',' | sed 's/,$//')
+
+# 2. If we found open, safe monitors, target them simultaneously
+if [ -n "$SAFE_MONITORS" ]; then
+    (
+        WAYLAND_DISPLAY=wayland-1 awww img "$WALL" \
+            --outputs "$SAFE_MONITORS" \
+            --transition-type wipe \
+            --transition-angle 30 \
+            --transition-step 12 \
+            --transition-pos top-right >/dev/null 2>&1
+    ) &
+    disown
+else
+    # Fallback to all screens if everything is fullscreen or jq parsing fails
+    (
+        WAYLAND_DISPLAY=wayland-1 awww img "$WALL" \
+            --transition-type wipe \
+            --transition-angle 30 \
+            --transition-step 12 \
+            --transition-pos top-right >/dev/null 2>&1
+    ) &
+    disown
+fi
+
+# Cache a copy to a static path
+cp "$WALL" "$STATIC_WALL"
 
 # =====================================================================
-# 6. Modular Loop: Execute extensions sequentially
+# 6. Modular Loop: Execute extensions concurrently
 # =====================================================================
 if [ -d "$EXTENSION_DIR" ]; then
     for ext in "$EXTENSION_DIR"/*; do
